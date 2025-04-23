@@ -56,14 +56,27 @@ impl From<OwnedThingy> for Sender {
 pub fn to_string(x: &OwnedThingy) -> String {
     (x.as_raw_handle() as isize).to_string()
 }
+
 pub unsafe fn from_string(x: &str) -> Result<OwnedThingy> {
     let x: isize = x.parse()?;
     Ok(OwnedThingy::from_raw_handle(x as *mut c_void))
 }
 
+unsafe fn set_inheritable_impl(x: &OwnedThingy) -> Result<()> {
+    if windows_sys::Win32::Foundation::SetHandleInformation(
+        x.as_raw_handle() as _,
+        windows_sys::Win32::Foundation::HANDLE_FLAG_INHERIT,
+        windows_sys::Win32::Foundation::HANDLE_FLAG_INHERIT,
+    ) == 0
+    {
+        return Err(anyhow!("failed to set inheritable (SetHandleInformation)"));
+    }
+    Ok(())
+}
+
 unsafe fn set_inheritable<T: Into<OwnedThingy> + From<OwnedThingy>>(x: T) -> Result<T> {
     let x: OwnedThingy = x.into();
-    set_non_inheritable_impl(&x)?;
+    set_inheritable_impl(&x)?;
     Ok(x.into())
 }
 
@@ -75,19 +88,6 @@ pub unsafe fn set_non_inheritable(x: &OwnedThingy) -> Result<()> {
     ) == 0
     {
         return Err(anyhow!("failed to set inheritable (SetHandleInformation)"));
-    }
-    Ok(())
-}
-pub unsafe fn set_non_inheritable_impl(x: &OwnedThingy) -> Result<()> {
-    if windows_sys::Win32::Foundation::SetHandleInformation(
-        x.as_raw_handle() as _,
-        windows_sys::Win32::Foundation::HANDLE_FLAG_INHERIT,
-        0,
-    ) == 0
-    {
-        return Err(anyhow!(
-            "failed to set non-inheritable (SetHandleInformation)"
-        ));
     }
     Ok(())
 }
