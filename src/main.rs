@@ -11,7 +11,7 @@ fn main_impl() -> Result<()> {
 
         let arg = dpipe_to_send.to_string();
         dbg!(&arg);
-        std::process::Command::new("./target/debug/hello_world")
+        std::process::Command::new(std::env::current_exe().unwrap())
             .arg(arg)
             .spawn()?;
         drop(dpipe_to_send);
