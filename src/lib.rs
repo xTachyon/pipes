@@ -57,25 +57,6 @@ unsafe fn set_non_inheritable<T: Into<os::OwnedThingy> + From<os::OwnedThingy>>(
 
 pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
     os::duplex_pipe()
-
-    // let (tx_1, rx_1) = pipe()?;
-    // let (tx_2, rx_2) = pipe()?;
-
-    // let mut dpipe = DuplexPipe { r: rx_2, s: tx_1 };
-    // let mut dpipe_to_send = DuplexPipeToSend {
-    //     r: rx_1.into(),
-    //     s: tx_2.into(),
-    // };
-
-    // unsafe {
-    //     dpipe.r = set_non_inheritable(dpipe.r)?;
-    //     dpipe.s = set_non_inheritable(dpipe.s)?;
-
-    //     dpipe_to_send.r = set_inheritable(dpipe_to_send.r)?;
-    //     dpipe_to_send.s = set_inheritable(dpipe_to_send.s)?;
-    // }
-
-    // Ok((dpipe, dpipe_to_send))
 }
 
 pub unsafe fn duplex_pipe_from_string(name: &str) -> Result<DuplexPipe> {
