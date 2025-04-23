@@ -67,6 +67,11 @@ pub unsafe fn set_non_inheritable(x: &OwnedThingy) -> Result<()> {
     Ok(())
 }
 
+unsafe fn dup(x: &OwnedFd) -> Result<OwnedFd> {
+    let fd = cvt(libc::dup(x.as_raw_fd()))?;
+    Ok(OwnedFd::from_raw_fd(fd))
+}
+
 #[cfg(target_os = "macos")]
 fn setsockopt<T>(sock: i32, level: i32, option_name: i32, option_value: T) -> Result<()> {
     unsafe {
@@ -100,8 +105,8 @@ pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
         setsockopt(fd2.as_raw_fd(), libc::SOL_SOCKET, libc::SO_NOSIGPIPE, 1)?;
     }
 
-    let fd3 = fd1.try_clone()?;
-    let fd4 = fd2.try_clone()?;
+    let fd3 = unsafe { dup(&fd1)? };
+    let fd4 = unsafe { dup(&fd2)? };
 
     let mut dpipe = DuplexPipe {
         r: Recver(fd1.into()),
