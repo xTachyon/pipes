@@ -78,7 +78,7 @@ fn setsockopt<T>(sock: i32, level: i32, option_name: i32, option_value: T) -> Re
             sock,
             level,
             option_name,
-            (&raw const option_value) as *const _,
+            (&option_value) as *const _,
             size_of::<T>() as libc::socklen_t,
         ))?;
         Ok(())

@@ -27,6 +27,9 @@ mod os {
     pub use super::windows::*;
 }
 
+pub use os::Recver;
+pub use os::Sender;
+
 use anyhow::anyhow;
 use anyhow::Result;
 
