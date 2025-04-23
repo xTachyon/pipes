@@ -10,10 +10,10 @@ fn main_impl() -> Result<()> {
         let (mut dpipe, dpipe_to_send) = duplex_pipe()?;
 
         let arg = dpipe_to_send.to_string();
-        // dbg!(&arg);
-        // Command::new("./target/debug/hello_world")
-        //     .arg(arg)
-        //     .spawn()?;
+        dbg!(&arg);
+        std::process::Command::new("./target/debug/hello_world")
+            .arg(arg)
+            .spawn()?;
         drop(dpipe_to_send);
 
         dpipe.s.write_all(b"hello from parent")?;
