@@ -16,12 +16,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+use crate::{forward_read, forward_write, DuplexPipe, DuplexPipeToSend};
 use anyhow::Result;
 use std::net::TcpStream;
 use std::os::fd::OwnedFd;
 use std::os::fd::{AsRawFd, FromRawFd};
-
-use crate::{forward_read, forward_write, DuplexPipe, DuplexPipeToSend};
 
 fn cvt(t: i32) -> std::io::Result<i32> {
     if t == -1 {
