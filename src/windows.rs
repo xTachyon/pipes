@@ -24,6 +24,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use std::fs::File;
 use std::io;
+use std::mem::size_of;
 use std::os::windows::io::FromRawHandle;
 use std::os::windows::prelude::OwnedHandle;
 use std::ptr::null_mut;
