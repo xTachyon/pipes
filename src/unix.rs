@@ -16,11 +16,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use crate::{forward_read, forward_write, DuplexPipe, DuplexPipeToSend};
+use crate::{DuplexPipe, DuplexPipeToSend, Recver, Sender};
 use anyhow::Result;
 use std::net::TcpStream;
 use std::os::fd::OwnedFd;
 use std::os::fd::{AsRawFd, FromRawFd};
+
+pub type Pipe = TcpStream;
+pub type OwnedThingy = std::os::fd::OwnedFd;
 
 fn cvt(t: i32) -> std::io::Result<i32> {
     if t == -1 {
@@ -29,28 +32,6 @@ fn cvt(t: i32) -> std::io::Result<i32> {
         Ok(t)
     }
 }
-
-pub struct Recver(pub TcpStream);
-
-forward_read!(Recver);
-
-impl From<OwnedFd> for Recver {
-    fn from(x: OwnedFd) -> Self {
-        Self(x.into())
-    }
-}
-
-pub struct Sender(pub TcpStream);
-
-forward_write!(Sender);
-
-impl From<OwnedFd> for Sender {
-    fn from(x: OwnedFd) -> Self {
-        Self(x.into())
-    }
-}
-
-pub type OwnedThingy = std::os::fd::OwnedFd;
 
 pub fn to_string(x: &OwnedThingy) -> String {
     x.as_raw_fd().to_string()
@@ -66,9 +47,12 @@ pub unsafe fn set_non_inheritable(x: &OwnedThingy) -> Result<()> {
     Ok(())
 }
 
-unsafe fn dup(x: &OwnedFd) -> Result<OwnedFd> {
-    let fd = cvt(libc::dup(x.as_raw_fd()))?;
-    Ok(OwnedFd::from_raw_fd(fd))
+// .try_clone() will set close-on-exec flag automatically, which is what we don't want in this situation.
+fn dup(x: &OwnedFd) -> Result<OwnedFd> {
+    unsafe {
+        let fd = cvt(libc::dup(x.as_raw_fd()))?;
+        Ok(OwnedFd::from_raw_fd(fd))
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -79,18 +63,13 @@ fn setsockopt<T>(sock: i32, level: i32, option_name: i32, option_value: T) -> Re
             level,
             option_name,
             &option_value as *const _ as *const _,
-            size_of::<T>() as libc::socklen_t,
+            std::mem::size_of::<T>() as libc::socklen_t,
         ))?;
         Ok(())
     }
 }
 
 pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
-    // #[cfg(target_os = "macos")]
-    // const SOCK_CLOEXEC: i32 = 0;
-    // #[cfg(not(target_os = "macos"))]
-    // const SOCK_CLOEXEC: i32 = libc::SOCK_CLOEXEC;
-
     let mut sv = [0; 2];
 
     cvt(unsafe { libc::socketpair(libc::AF_UNIX, libc::SOCK_STREAM, 0, sv.as_mut_ptr()) })?;
@@ -104,13 +83,13 @@ pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
         setsockopt(fd2.as_raw_fd(), libc::SOL_SOCKET, libc::SO_NOSIGPIPE, 1)?;
     }
 
-    let fd3 = unsafe { dup(&fd1)? };
-    let fd4 = unsafe { dup(&fd2)? };
-
+    let fd3 = dup(&fd1)?;
     let mut dpipe = DuplexPipe {
         r: Recver(fd1.into()),
         s: Sender(fd3.into()),
     };
+
+    let fd4 = dup(&fd2)?;
     let dpipe_to_send = DuplexPipeToSend { r: fd2, s: fd4 };
 
     unsafe {

@@ -9,25 +9,24 @@ fn main_impl() -> Result<()> {
     if is_parent {
         let (mut dpipe, dpipe_to_send) = duplex_pipe()?;
 
-        let arg = dpipe_to_send.to_string();
-        dbg!(&arg);
-        std::process::Command::new(std::env::current_exe().unwrap())
-            .arg(arg)
-            .spawn()?;
-        drop(dpipe_to_send);
+        dpipe_to_send.with_fds(|arg| {
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .arg(arg)
+                .spawn()
+        })?;
 
-        dpipe.s.write_all(b"hello from parent")?;
+        dpipe.s.write_all(b"hello from parent\n")?;
 
         let mut buf = String::with_capacity(128);
         let mut rx = BufReader::new(dpipe.r);
         rx.read_line(&mut buf)?;
 
-        assert_eq!(buf.trim(), "Hello from side B!");
+        assert_eq!(buf.trim(), "hello from child");
         println!("{}", buf);
     } else {
         let mut dpipe = unsafe { duplex_pipe_from_string(args[1].as_str()) }?;
 
-        dpipe.s.write_all(b"Hello from side B!\n")?;
+        dpipe.s.write_all(b"hello from child\n")?;
 
         let mut buf = String::with_capacity(128);
         let mut rx = BufReader::new(dpipe.r);

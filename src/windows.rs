@@ -16,15 +16,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use crate::forward_read;
-use crate::forward_write;
 use crate::DuplexPipe;
 use crate::DuplexPipeToSend;
+use crate::Recver;
+use crate::Sender;
 use anyhow::anyhow;
 use anyhow::Result;
 use std::fs::File;
 use std::io;
-use std::mem::size_of;
 use std::os::windows::io::FromRawHandle;
 use std::os::windows::prelude::OwnedHandle;
 use std::ptr::null_mut;
@@ -32,27 +31,8 @@ use std::{ffi::c_void, os::windows::io::AsRawHandle};
 use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
 use windows_sys::Win32::System::Pipes::CreatePipe;
 
+pub type Pipe = File;
 pub type OwnedThingy = std::os::windows::io::OwnedHandle;
-
-pub struct Recver(File);
-
-forward_read!(Recver);
-
-impl From<OwnedThingy> for Recver {
-    fn from(x: OwnedThingy) -> Self {
-        Self(x.into())
-    }
-}
-
-pub struct Sender(File);
-
-forward_write!(Sender);
-
-impl From<OwnedThingy> for Sender {
-    fn from(x: OwnedThingy) -> Self {
-        Self(x.into())
-    }
-}
 
 pub fn to_string(x: &OwnedThingy) -> String {
     (x.as_raw_handle() as isize).to_string()
@@ -113,8 +93,8 @@ pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
     let (rx_2, tx_2) = pipe()?;
 
     let dpipe = DuplexPipe {
-        r: rx_2.into(),
-        s: tx_1.into(),
+        r: Recver(rx_2.into()),
+        s: Sender(tx_1.into()),
     };
     let mut dpipe_to_send = DuplexPipeToSend {
         r: rx_1.into(),

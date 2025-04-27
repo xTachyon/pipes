@@ -26,29 +26,42 @@ mod os {
     #[cfg(target_os = "windows")]
     pub use super::windows::*;
 }
-
-pub use os::Recver;
-pub use os::Sender;
+mod macros;
 
 use anyhow::anyhow;
 use anyhow::Result;
+use macros::forward_read;
+use macros::forward_write;
+
+pub struct Recver(os::Pipe);
+pub struct Sender(os::Pipe);
+
+forward_read!(Recver);
+forward_write!(Sender);
 
 pub struct DuplexPipe {
-    pub r: os::Recver,
-    pub s: os::Sender,
+    pub r: Recver,
+    pub s: Sender,
 }
 
+/// This is used to send the duplex pipe to a child process, usually.
+/// Use `with_fds` to spawn a child process with the string given as argument.
+/// Then, call duplex_pipe_from_string with the string in the child process.
 pub struct DuplexPipeToSend {
     r: os::OwnedThingy,
     s: os::OwnedThingy,
 }
 impl DuplexPipeToSend {
-    pub fn to_string(&self) -> String {
-        format!(
+    pub fn with_fds<F, T, E>(self, f: F) -> Result<T, E>
+    where
+        F: Fn(String) -> Result<T, E>,
+    {
+        let s = format!(
             "dpipe:{},{}",
             os::to_string(&self.r),
             os::to_string(&self.s)
-        )
+        );
+        f(s)
     }
 }
 
@@ -62,6 +75,12 @@ pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
     os::duplex_pipe()
 }
 
+/// # Safety
+/// This function must be called exactly once in either the same process where
+/// DuplexPipeToSend::with_fds was called, or a child process that kept the descriptors open.
+/// Calling it more than once on the same string will result in possibly using some already
+/// opened file descriptor, which will probably corrupt your data.
+/// Not calling it at all will result in a file descriptor leak.
 pub unsafe fn duplex_pipe_from_string(name: &str) -> Result<DuplexPipe> {
     let Some(name) = name.strip_prefix("dpipe:") else {
         return Err(anyhow!("duple pipe name must start with dpipe:"));
@@ -73,7 +92,9 @@ pub unsafe fn duplex_pipe_from_string(name: &str) -> Result<DuplexPipe> {
     let Some(s) = split.next() else {
         return Err(anyhow!("can't parse sender fd"));
     };
-    assert_eq!(split.next(), None);
+    if split.next().is_some() {
+        return Err(anyhow!("too many arguments in duplex pipe name"));
+    }
 
     let mut r = os::from_string(r)?;
     let mut s = os::from_string(s)?;
@@ -84,42 +105,7 @@ pub unsafe fn duplex_pipe_from_string(name: &str) -> Result<DuplexPipe> {
     }
 
     Ok(DuplexPipe {
-        r: r.into(),
-        s: s.into(),
+        r: Recver(r.into()),
+        s: Sender(s.into()),
     })
 }
-
-macro_rules! forward_read {
-    ($t:ty) => {
-        impl std::io::Read for $t {
-            fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-                self.0.read(buf)
-            }
-            fn read_vectored(
-                &mut self,
-                bufs: &mut [std::io::IoSliceMut<'_>],
-            ) -> std::io::Result<usize> {
-                self.0.read_vectored(bufs)
-            }
-        }
-    };
-}
-pub(crate) use forward_read;
-
-macro_rules! forward_write {
-    ($t:ty) => {
-        impl std::io::Write for $t {
-            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-                self.0.write(buf)
-            }
-            fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
-                self.0.write_vectored(bufs)
-            }
-            #[inline]
-            fn flush(&mut self) -> std::io::Result<()> {
-                self.0.flush()
-            }
-        }
-    };
-}
-pub(crate) use forward_write;
