@@ -54,7 +54,7 @@ pub struct DuplexPipeToSend {
 impl DuplexPipeToSend {
     pub fn with_fds<F, T, E>(self, f: F) -> Result<T, E>
     where
-        F: Fn(String) -> Result<T, E>,
+        F: FnOnce(String) -> Result<T, E>,
     {
         let s = format!(
             "dpipe:{},{}",
