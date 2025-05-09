@@ -52,6 +52,7 @@ pub struct DuplexPipeToSend {
     s: os::OwnedThingy,
 }
 impl DuplexPipeToSend {
+    #[inline]
     pub fn with_fds<F, T, E>(self, f: F) -> Result<T, E>
     where
         F: FnOnce(String) -> Result<T, E>,
@@ -71,6 +72,7 @@ unsafe fn set_non_inheritable<T: Into<os::OwnedThingy> + From<os::OwnedThingy>>(
     Ok(x.into())
 }
 
+#[inline]
 pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
     os::duplex_pipe()
 }
@@ -81,6 +83,7 @@ pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
 /// Calling it more than once on the same string will result in possibly using some already
 /// opened file descriptor, which will probably corrupt your data.
 /// Not calling it at all will result in a file descriptor leak.
+#[inline]
 pub unsafe fn duplex_pipe_from_string(name: &str) -> Result<DuplexPipe> {
     let Some(name) = name.strip_prefix("dpipe:") else {
         return Err(anyhow!("duple pipe name must start with dpipe:"));
