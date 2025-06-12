@@ -6,7 +6,6 @@ rust-version = "1.75"
 
 [dependencies]
 anyhow = "1"
-interprocess = "2.2.3"
 libc = "0.2.172"
 windows-sys = { version = "0.59.0", features = [
     "Win32",
