@@ -18,6 +18,7 @@
 
 use crate::{DuplexPipe, DuplexPipeToSend, Recver, Sender};
 use anyhow::Result;
+use std::io::ErrorKind;
 use std::net::{Shutdown, TcpStream};
 use std::os::fd::OwnedFd;
 use std::os::fd::{AsRawFd, FromRawFd};
@@ -70,7 +71,11 @@ fn setsockopt<T>(sock: i32, level: i32, option_name: i32, option_value: T) -> Re
 }
 
 pub fn shutdown(x: &Pipe, how: Shutdown) {
-    x.shutdown(how).expect("shutdown failed");
+    match x.shutdown(how) {
+        Ok(_) => {}
+        Err(e) if e.kind() == ErrorKind::NotConnected => {}
+        Err(e) => panic!("shutdown failed: {e:?}"),
+    }
 }
 
 pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
@@ -101,7 +106,6 @@ pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
     };
 
     let dpipe_to_send = DuplexPipeToSend { r: fd2, s: fd4 };
-
 
     Ok((dpipe, dpipe_to_send))
 }
