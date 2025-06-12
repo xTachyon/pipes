@@ -24,6 +24,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use std::fs::File;
 use std::io;
+use std::net::Shutdown;
 use std::os::windows::io::FromRawHandle;
 use std::os::windows::prelude::OwnedHandle;
 use std::ptr::null_mut;
@@ -72,6 +73,8 @@ pub unsafe fn set_non_inheritable(x: &OwnedThingy) -> Result<()> {
     }
     Ok(())
 }
+
+pub fn shutdown(_: &Pipe, _: Shutdown) {}
 
 fn pipe() -> Result<(OwnedHandle, OwnedHandle)> {
     let mut r = INVALID_HANDLE_VALUE;

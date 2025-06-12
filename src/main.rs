@@ -31,6 +31,7 @@ fn main_impl() -> Result<()> {
         let mut dpipe = unsafe { duplex_pipe_from_string(args[1].as_str()) }?;
 
         dpipe.s.write_all(b"hello from child\n")?;
+        drop(dpipe.s);
 
         let mut buf = String::with_capacity(128);
         let mut rx = BufReader::new(dpipe.r);

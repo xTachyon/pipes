@@ -18,7 +18,7 @@
 
 use crate::{DuplexPipe, DuplexPipeToSend, Recver, Sender};
 use anyhow::Result;
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use std::os::fd::OwnedFd;
 use std::os::fd::{AsRawFd, FromRawFd};
 
@@ -42,7 +42,7 @@ pub unsafe fn from_string(x: &str) -> Result<OwnedThingy> {
     Ok(OwnedThingy::from_raw_fd(x))
 }
 
-pub unsafe fn set_non_inheritable(x: &OwnedThingy) -> Result<()> {
+pub unsafe fn set_non_inheritable(x: &OwnedFd) -> Result<()> {
     cvt(libc::fcntl(x.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC))?;
     Ok(())
 }
@@ -69,6 +69,10 @@ fn setsockopt<T>(sock: i32, level: i32, option_name: i32, option_value: T) -> Re
     }
 }
 
+pub fn shutdown(x: &Pipe, how: Shutdown) {
+    x.shutdown(how).expect("shutdown failed");
+}
+
 pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
     let mut sv = [0; 2];
 
@@ -84,18 +88,20 @@ pub fn duplex_pipe() -> Result<(DuplexPipe, DuplexPipeToSend)> {
     }
 
     let fd3 = dup(&fd1)?;
-    let mut dpipe = DuplexPipe {
+    let fd4 = dup(&fd2)?;
+
+    unsafe {
+        set_non_inheritable(&fd1)?;
+        set_non_inheritable(&fd3)?;
+    }
+
+    let dpipe = DuplexPipe {
         r: Recver(fd1.into()),
         s: Sender(fd3.into()),
     };
 
-    let fd4 = dup(&fd2)?;
     let dpipe_to_send = DuplexPipeToSend { r: fd2, s: fd4 };
 
-    unsafe {
-        dpipe.r = Recver(super::set_non_inheritable(dpipe.r.0)?);
-        dpipe.s = Sender(super::set_non_inheritable(dpipe.s.0)?);
-    }
 
     Ok((dpipe, dpipe_to_send))
 }

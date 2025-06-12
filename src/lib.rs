@@ -32,12 +32,25 @@ use anyhow::anyhow;
 use anyhow::Result;
 use macros::forward_read;
 use macros::forward_write;
+use std::net::Shutdown;
 
 pub struct Recver(os::Pipe);
 pub struct Sender(os::Pipe);
 
 forward_read!(Recver);
 forward_write!(Sender);
+
+impl Drop for Recver {
+    fn drop(&mut self) {
+        os::shutdown(&self.0, Shutdown::Read);
+    }
+}
+
+impl Drop for Sender {
+    fn drop(&mut self) {
+        os::shutdown(&self.0, Shutdown::Write);
+    }
+}
 
 pub struct DuplexPipe {
     pub r: Recver,
@@ -64,12 +77,6 @@ impl DuplexPipeToSend {
         );
         f(s)
     }
-}
-
-unsafe fn set_non_inheritable<T: Into<os::OwnedThingy> + From<os::OwnedThingy>>(x: T) -> Result<T> {
-    let x: os::OwnedThingy = x.into();
-    os::set_non_inheritable(&x)?;
-    Ok(x.into())
 }
 
 #[inline]
@@ -99,12 +106,12 @@ pub unsafe fn duplex_pipe_from_string(name: &str) -> Result<DuplexPipe> {
         return Err(anyhow!("too many arguments in duplex pipe name"));
     }
 
-    let mut r = os::from_string(r)?;
-    let mut s = os::from_string(s)?;
+    let r = os::from_string(r)?;
+    let s = os::from_string(s)?;
 
     unsafe {
-        r = set_non_inheritable(r)?;
-        s = set_non_inheritable(s)?;
+        os::set_non_inheritable(&r)?;
+        os::set_non_inheritable(&s)?;
     }
 
     Ok(DuplexPipe {
